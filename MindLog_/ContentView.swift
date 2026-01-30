@@ -9,53 +9,43 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @State private var selectedTab = 0
+    
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
+        TabView(selection: $selectedTab) {
+            // Tab 1: 手帐
+            JournalListView()
+                .tabItem {
+                    Label("手帐", systemImage: selectedTab == 0 ? "book.fill" : "book")
                 }
-                .onDelete(perform: deleteItems)
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+                .tag(0)
+            
+            // Tab 2: AI 助手
+            AIHomeView()
+                .tabItem {
+                    Label("Chat", systemImage: selectedTab == 1 ? "brain.head.profile.fill" : "brain.head.profile")
                 }
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                .tag(1)
+            
+            // Tab 3: 社区
+            CommunityFeedView()
+                .tabItem {
+                    Label("社区", systemImage: selectedTab == 2 ? "person.3.fill" : "person.3")
                 }
-            }
-        } detail: {
-            Text("Select an item")
+                .tag(2)
+            
+            // Tab 4: 我的
+            ProfileView()
+                .tabItem {
+                    Label("我的", systemImage: selectedTab == 3 ? "person.fill" : "person")
+                }
+                .tag(3)
         }
-    }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
-            }
-        }
+        .tint(.blue)  // TabView 选中颜色
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
+        .modelContainer(for: JournalEntry.self, inMemory: true)
 }
