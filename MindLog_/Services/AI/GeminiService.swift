@@ -50,9 +50,10 @@ final class GeminiService {
         1. **标签（tags）**：生成 3-5 个标签，用于分类和检索
         2. **总结（summary）**：用 1-2 句话概括日记核心内容
         3. **情感评分（sentimentScore）**：0-1 的分数，0=最消极，0.5=中性，1=最积极
-        4. **待办事项（todos）**：提取明确的待办事项，包含标题和优先级（低/中/高）
-        5. **购物清单（shoppingList）**：提取需要购买的物品
-        6. **日程安排（schedule）**：提取具体的日程信息
+        4. **情绪基调（emotionTone）**：用1-2句话深度解析当前的情绪状态（如："今天经历了紧张的工作，但晚上做饭获得了治愈和满足。"）
+        5. **待办事项（todos）**：提取明确的待办事项，包含标题和优先级（低/中/高）
+        6. **购物清单（shoppingList）**：提取需要购买的物品
+        7. **日程安排（schedule）**：提取具体的日程信息
 
         日记内容：
         \(text)
@@ -62,6 +63,7 @@ final class GeminiService {
             "tags": ["标签1", "标签2", "标签3"],
             "summary": "总结内容",
             "sentimentScore": 0.7,
+            "emotionTone": "情绪基调字符串",
             "todos": [
                 {"title": "待办标题", "priority": "高"}
             ],

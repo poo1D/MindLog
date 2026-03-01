@@ -292,6 +292,8 @@ struct JournalEditorView: View {
         // 确保至少有标题或内容
         let finalTitle = title.isEmpty ? "无标题" : title
 
+        let savedEntry: JournalEntry
+
         if let entry = entry {
             // 编辑现有日记
             entry.title = finalTitle
@@ -300,6 +302,7 @@ struct JournalEditorView: View {
             entry.weather = selectedWeather
             entry.exercise = selectedExercise
             entry.updatedAt = Date()
+            savedEntry = entry
         } else {
             // 创建新日记
             let newEntry = JournalEntry(
@@ -310,6 +313,14 @@ struct JournalEditorView: View {
                 exercise: selectedExercise
             )
             modelContext.insert(newEntry)
+            savedEntry = newEntry
+        }
+        
+        try? modelContext.save()
+
+        // 静默触发 Agent 工作流 (分析情绪 + RAG回忆 + 生成故事)
+        Task {
+            await AgentService.shared.processJournalEntry(savedEntry, in: modelContext)
         }
 
         dismiss()

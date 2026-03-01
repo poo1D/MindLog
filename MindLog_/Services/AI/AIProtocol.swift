@@ -19,6 +19,8 @@ struct AIAnalysisResult: Codable, Sendable {
     var summary: String?
     /// 情感评分 (0-1, 0=最消极, 1=最积极)
     var sentimentScore: Double?
+    /// 深入的情绪基调分析
+    var emotionTone: String?
     /// 提取的待办事项
     var todos: [ExtractedTodo]?
     /// 购物清单
