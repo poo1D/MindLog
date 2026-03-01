@@ -32,6 +32,10 @@ final class JournalEntry {
     var aiSentimentScore: Double?  // 情感评分 (0-1)
     var isAIAnalyzed: Bool = false  // 是否已进行 AI 分析
 
+    // AI 提取和生成的更深层情感资产 (Agent Workflow)
+    var emotionTone: String? // 情绪基调，例如“疲惫但充实”
+    var aiStory: String? // 为宠物 Echo 生成的历险故事
+
     // 关系：附件（图片、音频、视频）
     @Relationship(deleteRule: .cascade)
     var attachments: [Attachment]?
@@ -57,6 +61,8 @@ final class JournalEntry {
         aiSummary: String? = nil,
         aiLayout: String? = nil,
         aiSentimentScore: Double? = nil,
+        emotionTone: String? = nil,
+        aiStory: String? = nil,
         isAIAnalyzed: Bool = false,
         attachments: [Attachment]? = nil,
         shoppingList: [ShoppingItem]? = nil,
@@ -75,6 +81,8 @@ final class JournalEntry {
         self.aiSummary = aiSummary
         self.aiLayout = aiLayout
         self.aiSentimentScore = aiSentimentScore
+        self.emotionTone = emotionTone
+        self.aiStory = aiStory
         self.isAIAnalyzed = isAIAnalyzed
         self.attachments = attachments
         self.shoppingList = shoppingList
