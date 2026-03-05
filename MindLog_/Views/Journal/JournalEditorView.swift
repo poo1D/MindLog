@@ -3,6 +3,7 @@
 //  MindLog_
 //
 //  Created by Siegfried on 2026/1/29.
+//  Updated: 2026/3/5 - 添加多媒体输入功能（图片、音频、视频）
 //
 
 import SwiftUI
@@ -30,17 +31,30 @@ struct JournalEditorView: View {
     @State private var showingAIAnalysis = false
     @State private var showingAIError = false
 
+    // 多媒体 Sheet 状态
+    @State private var showingImagePicker = false
+    @State private var showingAudioRecorder = false
+    @State private var showingVideoPicker = false
+
     // AI 分析状态
     @State private var isAnalyzing = false
     @State private var aiAnalysisResult: AIAnalysisResult?
     @State private var aiErrorMessage: String?
 
+    // 多媒体附件数据
+    @State private var imageAttachments: [(url: URL, image: UIImage)] = []
+    @State private var audioAttachments: [URL] = []
+    @State private var videoAttachments: [(url: URL, thumbnail: UIImage?)] = []
+    @State private var pendingImages: [UIImage] = []
+    @State private var recordedAudioURL: URL?
+    @State private var selectedVideoURL: URL?
+
     @FocusState private var isContentFocused: Bool
-    
+
     var isEditing: Bool {
         entry != nil
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -54,7 +68,7 @@ struct JournalEditorView: View {
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     // 主编辑区域
                     ScrollView {
@@ -66,7 +80,7 @@ struct JournalEditorView: View {
                                 .lineLimit(2)
                                 .padding(.horizontal, 20)
                                 .padding(.top, 20)
-                            
+
                             // 元数据标签区域（Liquid Glass 风格）
                             if selectedMood != nil || selectedWeather != nil || selectedExercise != nil {
                                 ScrollView(.horizontal) {
@@ -83,7 +97,7 @@ struct JournalEditorView: View {
                                                 }
                                             }
                                         }
-                                        
+
                                         // 天气标签
                                         if let weather = selectedWeather {
                                             LiquidGlassChip(
@@ -96,7 +110,7 @@ struct JournalEditorView: View {
                                                 }
                                             }
                                         }
-                                        
+
                                         // 运动标签
                                         if let exercise = selectedExercise {
                                             LiquidGlassChip(
@@ -114,13 +128,38 @@ struct JournalEditorView: View {
                                 }
                                 .scrollIndicators(.hidden)
                             }
-                            
+
+                            // 附件预览区域
+                            AttachmentPreviewGrid(
+                                imageAttachments: $imageAttachments,
+                                audioAttachments: $audioAttachments,
+                                videoAttachments: $videoAttachments,
+                                onDeleteImage: { index in
+                                    withAnimation(.spring(response: 0.3)) {
+                                        let removed = imageAttachments.remove(at: index)
+                                        try? ImageStorageService.shared.deleteImage(at: removed.url)
+                                    }
+                                },
+                                onDeleteAudio: { index in
+                                    withAnimation(.spring(response: 0.3)) {
+                                        let removed = audioAttachments.remove(at: index)
+                                        try? AudioStorageService.shared.deleteAudio(at: removed)
+                                    }
+                                },
+                                onDeleteVideo: { index in
+                                    withAnimation(.spring(response: 0.3)) {
+                                        let removed = videoAttachments.remove(at: index)
+                                        try? VideoStorageService.shared.deleteVideo(at: removed.url)
+                                    }
+                                }
+                            )
+
                             // 内容输入区域（Liquid Glass 卡片）
                             ZStack(alignment: .topLeading) {
                                 // 半透明背景
                                 RoundedRectangle(cornerRadius: 20)
                                     .fill(.ultraThinMaterial)
-                                
+
                                 VStack(alignment: .leading, spacing: 0) {
                                     if content.isEmpty && !isContentFocused {
                                         Text("记录今天发生的事...")
@@ -128,7 +167,7 @@ struct JournalEditorView: View {
                                             .padding(.horizontal, 16)
                                             .padding(.top, 16)
                                     }
-                                    
+
                                     TextEditor(text: $content)
                                         .focused($isContentFocused)
                                         .font(.body)
@@ -143,7 +182,7 @@ struct JournalEditorView: View {
                             .padding(.bottom, 20)
                         }
                     }
-                    
+
                     // 分隔线
                     Divider()
 
@@ -199,29 +238,41 @@ struct JournalEditorView: View {
 
                         Spacer()
 
-                        // 图片（占位）
+                        // 图片
                         ToolbarButton(
                             systemIcon: "photo",
                             label: "图片",
-                            isActive: false,
+                            isActive: !imageAttachments.isEmpty,
                             activeColor: .green
                         ) {
-                            // TODO: 图片选择
+                            showingImagePicker = true
                         }
 
                         Spacer()
 
-                        // 音频（占位）
+                        // 音频
                         ToolbarButton(
                             systemIcon: "waveform",
                             label: "音频",
-                            isActive: false,
+                            isActive: !audioAttachments.isEmpty,
                             activeColor: .purple
                         ) {
-                            // TODO: 音频录制
+                            showingAudioRecorder = true
+                        }
+
+                        Spacer()
+
+                        // 视频
+                        ToolbarButton(
+                            systemIcon: "video",
+                            label: "视频",
+                            isActive: !videoAttachments.isEmpty,
+                            activeColor: .red
+                        ) {
+                            showingVideoPicker = true
                         }
                     }
-                    .padding(.horizontal, 24)
+                    .padding(.horizontal, 16)
                     .padding(.vertical, 12)
                 }
             }
@@ -233,7 +284,7 @@ struct JournalEditorView: View {
                         dismiss()
                     }
                 }
-                
+
                 ToolbarItem(placement: .confirmationAction) {
                     Button("完成") {
                         saveEntry()
@@ -252,6 +303,7 @@ struct JournalEditorView: View {
                 }
             }
         }
+        // MARK: - Sheet 呈现
         .sheet(isPresented: $showingMoodPicker) {
             MoodPickerView(selectedMood: $selectedMood)
                 .presentationDetents([.medium, .large])
@@ -276,8 +328,35 @@ struct JournalEditorView: View {
         } message: { error in
             Text(error)
         }
+        // 多媒体 Sheet
+        .sheet(isPresented: $showingImagePicker) {
+            MultiImagePicker(
+                selectedImages: $pendingImages,
+                maxCount: AppConstants.AI.maxImageCount - imageAttachments.count
+            )
+            .presentationDetents([.large])
+            .onDisappear {
+                processPendingImages()
+            }
+        }
+        .sheet(isPresented: $showingAudioRecorder) {
+            AudioRecorderView(recordedAudioURL: $recordedAudioURL)
+                .presentationDetents([.large])
+                .onDisappear {
+                    processRecordedAudio()
+                }
+        }
+        .sheet(isPresented: $showingVideoPicker) {
+            VideoPicker(selectedVideoURL: $selectedVideoURL)
+                .presentationDetents([.large])
+                .onDisappear {
+                    processSelectedVideo()
+                }
+        }
     }
-    
+
+    // MARK: - 数据加载
+
     private func loadEntry() {
         if let entry = entry {
             title = entry.title
@@ -285,12 +364,118 @@ struct JournalEditorView: View {
             selectedMood = entry.mood
             selectedWeather = entry.weather
             selectedExercise = entry.exercise
+
+            // 加载已有附件
+            if let attachments = entry.attachments {
+                for attachment in attachments {
+                    switch attachment.type {
+                    case .image:
+                        if let image = ImageStorageService.shared.loadImage(from: attachment.fileURL) {
+                            imageAttachments.append((url: attachment.fileURL, image: image))
+                        }
+                    case .audio:
+                        audioAttachments.append(attachment.fileURL)
+                    case .video:
+                        let thumbnail = VideoStorageService.shared.generateThumbnail(from: attachment.fileURL)
+                        videoAttachments.append((url: attachment.fileURL, thumbnail: thumbnail))
+                    }
+                }
+            }
         }
     }
-    
+
+    // MARK: - 多媒体处理
+
+    /// 处理从 ImagePicker 选择的图片
+    private func processPendingImages() {
+        guard !pendingImages.isEmpty else { return }
+
+        for image in pendingImages {
+            do {
+                let url = try ImageStorageService.shared.saveImage(image)
+                withAnimation(.spring(response: 0.3)) {
+                    imageAttachments.append((url: url, image: image))
+                }
+            } catch {
+                print("Failed to save image: \(error)")
+            }
+        }
+        pendingImages = []
+    }
+
+    /// 处理录制的音频
+    private func processRecordedAudio() {
+        guard let url = recordedAudioURL else { return }
+        withAnimation(.spring(response: 0.3)) {
+            audioAttachments.append(url)
+        }
+        recordedAudioURL = nil
+    }
+
+    /// 处理选择的视频
+    private func processSelectedVideo() {
+        guard let url = selectedVideoURL else { return }
+        let thumbnail = VideoStorageService.shared.generateThumbnail(from: url)
+        withAnimation(.spring(response: 0.3)) {
+            videoAttachments.append((url: url, thumbnail: thumbnail))
+        }
+        selectedVideoURL = nil
+    }
+
+    // MARK: - 保存
+
     private func saveEntry() {
         // 确保至少有标题或内容
         let finalTitle = title.isEmpty ? "无标题" : title
+
+        // 构建附件数组
+        var attachments: [Attachment] = []
+
+        // 图片附件
+        for img in imageAttachments {
+            let size = ImageStorageService.shared.fileSize(at: img.url)
+            let attachment = Attachment(
+                type: .image,
+                fileURL: img.url,
+                metadata: AttachmentMetadata(
+                    fileName: img.url.lastPathComponent,
+                    fileSize: size
+                )
+            )
+            attachments.append(attachment)
+        }
+
+        // 音频附件
+        for audioURL in audioAttachments {
+            let size = AudioStorageService.shared.fileSize(at: audioURL)
+            let duration = AudioStorageService.shared.getAudioDuration(url: audioURL)
+            let attachment = Attachment(
+                type: .audio,
+                fileURL: audioURL,
+                metadata: AttachmentMetadata(
+                    fileName: audioURL.lastPathComponent,
+                    fileSize: size,
+                    duration: duration
+                )
+            )
+            attachments.append(attachment)
+        }
+
+        // 视频附件
+        for video in videoAttachments {
+            let size = VideoStorageService.shared.fileSize(at: video.url)
+            let thumbURL = try? VideoStorageService.shared.saveThumbnail(from: video.url)
+            let attachment = Attachment(
+                type: .video,
+                fileURL: video.url,
+                metadata: AttachmentMetadata(
+                    fileName: video.url.lastPathComponent,
+                    fileSize: size,
+                    thumbnailURL: thumbURL
+                )
+            )
+            attachments.append(attachment)
+        }
 
         if let entry = entry {
             // 编辑现有日记
@@ -300,6 +485,7 @@ struct JournalEditorView: View {
             entry.weather = selectedWeather
             entry.exercise = selectedExercise
             entry.updatedAt = Date()
+            entry.attachments = attachments
         } else {
             // 创建新日记
             let newEntry = JournalEntry(
@@ -307,7 +493,8 @@ struct JournalEditorView: View {
                 textContent: content.isEmpty ? nil : content,
                 mood: selectedMood,
                 weather: selectedWeather,
-                exercise: selectedExercise
+                exercise: selectedExercise,
+                attachments: attachments
             )
             modelContext.insert(newEntry)
         }
@@ -325,9 +512,17 @@ struct JournalEditorView: View {
 
         isAnalyzing = true
 
+        // 收集图片的 Base64 数据用于多模态分析
+        var base64Images: [String]?
+        if !imageAttachments.isEmpty {
+            base64Images = imageAttachments.prefix(AppConstants.AI.maxImageCount).compactMap { item in
+                ImageStorageService.shared.imageToBase64(item.image)
+            }
+        }
+
         do {
             let service = KimiService()
-            let result = try await service.analyzeContent(text: content, base64Images: nil)
+            let result = try await service.analyzeContent(text: content, base64Images: base64Images)
 
             await MainActor.run {
                 self.aiAnalysisResult = result
@@ -361,9 +556,9 @@ struct ToolbarButton: View {
     var isActive: Bool = false
     var activeColor: Color = .blue
     let action: () -> Void
-    
+
     @State private var isPressed = false
-    
+
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
@@ -373,13 +568,13 @@ struct ToolbarButton: View {
                     Circle()
                         .fill(.ultraThinMaterial)
                         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
-                    
+
                     // 激活状态的彩色边框
                     if isActive {
                         Circle()
                             .strokeBorder(activeColor.opacity(0.3), lineWidth: 2)
                     }
-                    
+
                     // 激活状态的内发光
                     if isActive {
                         Circle()
@@ -396,13 +591,13 @@ struct ToolbarButton: View {
                                 )
                             )
                     }
-                    
+
                     // 图标
                     Image(systemName: isActive ? systemIcon + ".fill" : systemIcon)
-                        .font(.system(size: 22, weight: .medium))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundStyle(isActive ? activeColor : .secondary)
                 }
-                .frame(width: 50, height: 50)
+                .frame(width: 44, height: 44)
             }
         }
         .buttonStyle(GlassButtonStyle(isPressed: $isPressed))
@@ -412,7 +607,7 @@ struct ToolbarButton: View {
 /// Liquid Glass 按钮样式 - 弹性按压效果
 struct GlassButtonStyle: ButtonStyle {
     @Binding var isPressed: Bool
-    
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.90 : 1.0)
@@ -430,19 +625,19 @@ struct LiquidGlassChip: View {
     let text: String
     let color: Color
     let onRemove: () -> Void
-    
+
     var body: some View {
         HStack(spacing: 8) {
             // Emoji 图标
             Text(icon)
                 .font(.body)
-            
+
             // 文字
             Text(text)
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundColor(color)
-            
+
             // 删除按钮
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
@@ -457,11 +652,11 @@ struct LiquidGlassChip: View {
                 // 毛玻璃背景
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.ultraThinMaterial)
-                
+
                 // 彩色边框
                 RoundedRectangle(cornerRadius: 20)
                     .strokeBorder(color.opacity(0.3), lineWidth: 1.5)
-                
+
                 // 内发光效果
                 RoundedRectangle(cornerRadius: 20)
                     .fill(
@@ -486,7 +681,7 @@ struct MetadataChip: View {
     let text: String
     let color: Color
     let onRemove: () -> Void
-    
+
     var body: some View {
         LiquidGlassChip(icon: icon, text: text, color: color, onRemove: onRemove)
     }
@@ -505,7 +700,7 @@ struct MetadataChip: View {
         weather: WeatherInfo(condition: .sunny, temperature: 25),
         exercise: ExerciseRecord(type: .running, duration: 1800)
     )
-    
+
     return JournalEditorView(entry: entry)
         .modelContainer(for: JournalEntry.self, inMemory: true)
 }
